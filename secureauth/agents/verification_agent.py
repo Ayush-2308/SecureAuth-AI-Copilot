@@ -68,11 +68,13 @@ def verify_otp(user_id: str, submitted_otp: str) -> bool:
 def _issue_otp(user_id: str) -> dict:
     otp = f"{secrets.randbelow(10**_OTP_DIGITS):0{_OTP_DIGITS}d}"
     expires_at = datetime.now(timezone.utc) + OTP_TTL
-    _otp_challenges[user_id] = (_hash_otp(otp), expires_at)
+    otp_hash = _hash_otp(otp)
+    _otp_challenges[user_id] = (otp_hash, expires_at)
     return {
         "action": "challenge_otp",
         "user_id": user_id,
         "status": "pending",
+        "otp_hash": otp_hash,
         "expires_at": expires_at.isoformat(),
         "message": "A one-time passcode was issued.",
     }

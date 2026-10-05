@@ -1,0 +1,82 @@
+import logging
+from uuid import uuid4
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+from secureauth.agents.verification_agent import verify_otp
+from secureauth.db.supabase_client import log_security_event
+from secureauth.graph import run_pipeline
+from secureauth.schemas.models import LoginEvent, RiskAssessment
+
+logger = logging.getLogger("secureauth.api")
+
+app = FastAPI(title="SecureAuth AI Copilot")
+
+_CHALLENGE_ACTIONS = {"challenge_otp", "challenge_biometric"}
+
+
+class LoginEventResponse(BaseModel):
+    assessment: RiskAssessment
+    recommended_action: str
+    challenge_sent: bool
+    message: str
+
+
+class VerifyOtpRequest(BaseModel):
+    user_id: str
+    otp: str
+
+
+class VerifyOtpResponse(BaseModel):
+    success: bool
+
+
+@app.post("/login-event", response_model=LoginEventResponse)
+def login_event(event: LoginEvent) -> LoginEventResponse:
+    try:
+        state = run_pipeline(event)
+        if state.assessment is None:
+            raise RuntimeError("Pipeline finished without a risk assessment")
+        return _login_response(state.assessment)
+    except Exception as exc:
+        _record_failure("login-event", event.user_id, exc)
+        raise HTTPException(status_code=500, detail="Login assessment failed") from exc
+
+
+@app.post("/verify-otp", response_model=VerifyOtpResponse)
+def verify_otp_endpoint(body: VerifyOtpRequest) -> VerifyOtpResponse:
+    try:
+        success = verify_otp(body.user_id, body.otp)
+    except Exception as exc:
+        _record_failure("verify-otp", body.user_id, exc)
+        raise HTTPException(status_code=500, detail="OTP verification failed") from exc
+    return VerifyOtpResponse(success=success)
+
+
+def _login_response(assessment: RiskAssessment) -> LoginEventResponse:
+    action = assessment.recommended_action
+    challenge_sent = action in _CHALLENGE_ACTIONS
+    if action == "challenge_otp":
+        message = "A one-time passcode challenge was sent."
+    elif action == "challenge_biometric":
+        message = "A biometric challenge was sent."
+    elif action == "block":
+        message = "Login denied."
+    else:
+        message = "Login allowed."
+    return LoginEventResponse(
+        assessment=assessment,
+        recommended_action=action,
+        challenge_sent=challenge_sent,
+        message=message,
+    )
+
+
+def _record_failure(operation: str, user_id: str, exc: Exception) -> None:
+    detail = f"{operation} failed for user {user_id}: {exc.__class__.__name__}"
+    logger.exception(detail)
+    try:
+        log_security_event(str(uuid4()), detail)
+    except Exception:
+        logger.exception("Could not write the security event for %s", operation)

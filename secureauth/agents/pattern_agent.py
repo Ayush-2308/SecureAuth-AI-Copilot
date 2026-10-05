@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from secureauth.db.supabase_client import get_user_login_history
 from secureauth.schemas.models import LoginEvent, RiskFeatures
 
 # A handful of prior logins is required before an hour can be called unusual.
@@ -7,14 +8,20 @@ _MIN_LOGINS_FOR_HOUR_PATTERN = 3
 _ATTEMPT_WINDOW = timedelta(hours=1)
 
 
-def extract_features(event: LoginEvent, user_history: list[dict]) -> RiskFeatures:
+def extract_features(
+    event: LoginEvent, user_history: list[dict] | None = None
+) -> RiskFeatures:
     """Compare a login with the user's past logins and return risk features.
 
-    History rows use the same fields as ``LoginEvent``. ``timestamp`` may be a
-    ``datetime`` or an ISO-8601 string. The current attempt is included in
-    ``login_attempts_last_hour``. Hour-of-day is unusual only when the user
-    already has a pattern and has not logged in during this hour before.
+    When ``user_history`` is omitted, the most recent rows are loaded from
+    Supabase. Passed-in rows use the same fields as ``LoginEvent``.
+    ``timestamp`` may be a ``datetime`` or an ISO-8601 string. The current
+    attempt is included in ``login_attempts_last_hour``. Hour-of-day is
+    unusual only when the user already has a pattern and has not logged in
+    during this hour before.
     """
+    if user_history is None:
+        user_history = get_user_login_history(event.user_id)
     records = _records_for_user(event, user_history)
     prior_timestamps = _prior_timestamps(event, records)
 
