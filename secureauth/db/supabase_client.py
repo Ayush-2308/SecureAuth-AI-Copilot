@@ -76,6 +76,28 @@ def store_otp(user_id: str, otp_hash: str, expires_at: datetime) -> None:
     ).execute()
 
 
+def latest_unverified_otp(user_id: str) -> dict | None:
+    """Return the newest unused OTP hash for this user, if one exists."""
+    response = (
+        get_supabase()
+        .table("otp_challenges")
+        .select("id,otp_hash,expires_at,verified")
+        .eq("user_id", user_id)
+        .eq("verified", False)
+        .order("expires_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    rows = list(response.data or [])
+    return rows[0] if rows else None
+
+
+def mark_otp_verified(challenge_id: str) -> None:
+    get_supabase().table("otp_challenges").update({"verified": True}).eq(
+        "id", challenge_id
+    ).execute()
+
+
 def log_security_event(event_id: str, detail: str) -> None:
     """Append one security audit line for a pipeline event."""
     get_supabase().table("security_events").insert(

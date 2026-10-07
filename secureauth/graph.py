@@ -12,6 +12,7 @@ from secureauth.db.supabase_client import (
     save_assessment,
     store_otp,
 )
+from secureauth.profiles import needs_phone_otp
 from secureauth.schemas.models import LoginEvent, PipelineState
 
 
@@ -38,6 +39,11 @@ def decide(state: PipelineState) -> dict:
         state.assessment,
         login_attempts_last_hour=state.features.login_attempts_last_hour,
     )
+    event = state.login_event
+    if action != "block" and needs_phone_otp(
+        event.user_id, event.device_id, event.location
+    ):
+        action = "challenge_otp"
     assessment = state.assessment.model_copy(update={"recommended_action": action})
     return {"assessment": assessment, "status": "decided"}
 

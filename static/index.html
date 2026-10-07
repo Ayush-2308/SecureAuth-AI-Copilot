@@ -143,13 +143,14 @@
     <header>
       <h1>SecureAuth</h1>
       <p>Check a login against the user's usual device, place, and time. The score decides whether to allow it, ask for a code or fingerprint, or block it.</p>
+      <p id="profile">Demo account: Ayush. Usual phone is phone-ayush in Delhi. A different device or city sends an OTP to the phone ending 6155.</p>
     </header>
     <div class="layout">
       <section>
         <h2>Login attempt</h2>
         <form id="login-form">
           <label>User
-            <input name="user_id" value="user-1" required>
+            <input name="user_id" value="Ayush" required>
           </label>
           <label>When
             <input name="timestamp" type="datetime-local" required>
@@ -158,7 +159,7 @@
             <input name="ip_address" value="203.0.113.10" required>
           </label>
           <label>Device id
-            <input name="device_id" value="phone-rahul" required>
+            <input name="device_id" value="phone-ayush" required>
           </label>
           <label>Device type
             <select name="device_type">
@@ -175,7 +176,7 @@
             </select>
           </label>
           <label class="wide">Location
-            <input name="location" value="Mumbai">
+            <input name="location" value="Delhi">
           </label>
           <div class="actions">
             <button type="submit" id="check-btn">Check login</button>
@@ -188,7 +189,7 @@
           <p class="empty">Submit a login to see the risk score, the reason, and the next step.</p>
         </div>
         <div class="otp" id="otp-box">
-          <p>Enter the 6-digit code for this user. The screen never shows the code itself.</p>
+          <p>Enter the 6-digit code sent to Ayush's phone. The screen never shows the code itself.</p>
           <form id="otp-form" class="otp-row">
             <input name="otp" inputmode="numeric" maxlength="6" placeholder="000000" required>
             <button type="submit" id="otp-btn">Verify</button>

@@ -11,3 +11,5 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "")
 RISK_THRESHOLD_MEDIUM = float(os.getenv("RISK_THRESHOLD_MEDIUM", "0.3"))
 RISK_THRESHOLD_HIGH = float(os.getenv("RISK_THRESHOLD_HIGH", "0.7"))
+# "textbelt" is the public free key: one SMS per day.
+TEXTBELT_KEY = os.getenv("TEXTBELT_KEY", "textbelt")

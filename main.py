@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from secureauth.agents.verification_agent import verify_otp
 from secureauth.db.supabase_client import log_security_event
 from secureauth.graph import run_pipeline
+from secureauth.profiles import DEMO_ACCOUNT, matches_demo_user
 from secureauth.schemas.models import LoginEvent, RiskAssessment
 
 logger = logging.getLogger("secureauth.api")
@@ -21,6 +22,19 @@ _PAGE = Path(__file__).resolve().parent / "static" / "index.html"
 @app.get("/")
 def home() -> FileResponse:
     return FileResponse(_PAGE)
+
+
+@app.get("/demo-profile")
+def demo_profile() -> dict:
+    phone = DEMO_ACCOUNT["phone"]
+    return {
+        "name": DEMO_ACCOUNT["name"],
+        "user_id": DEMO_ACCOUNT["user_id"],
+        "phone": phone,
+        "phone_hint": f"ending {phone[-4:]}",
+        "usual_device_id": DEMO_ACCOUNT["usual_device_id"],
+        "usual_location": DEMO_ACCOUNT["usual_location"],
+    }
 
 _CHALLENGE_ACTIONS = {"challenge_otp", "challenge_biometric"}
 
@@ -47,7 +61,7 @@ def login_event(event: LoginEvent) -> LoginEventResponse:
         state = run_pipeline(event)
         if state.assessment is None:
             raise RuntimeError("Pipeline finished without a risk assessment")
-        return _login_response(state.assessment)
+        return _login_response(state.assessment, state)
     except Exception as exc:
         _record_failure("login-event", event.user_id, exc)
         raise HTTPException(status_code=500, detail=_public_error(exc, "Login assessment failed")) from exc
@@ -63,10 +77,20 @@ def verify_otp_endpoint(body: VerifyOtpRequest) -> VerifyOtpResponse:
     return VerifyOtpResponse(success=success)
 
 
-def _login_response(assessment: RiskAssessment) -> LoginEventResponse:
+def _login_response(assessment: RiskAssessment, state) -> LoginEventResponse:
     action = assessment.recommended_action
     challenge_sent = action in _CHALLENGE_ACTIONS
-    if action == "challenge_otp":
+    sms_sent = bool((state.verification_result or {}).get("sms_sent"))
+    if action == "challenge_otp" and matches_demo_user(state.login_event.user_id):
+        hint = DEMO_ACCOUNT["phone"][-4:]
+        if sms_sent:
+            message = f"OTP sent to Ayush's phone ending {hint}."
+        else:
+            message = (
+                f"OTP should go to Ayush's phone ending {hint}, "
+                "but the free SMS for today was already used."
+            )
+    elif action == "challenge_otp":
         message = "A one-time passcode challenge was sent."
     elif action == "challenge_biometric":
         message = "A biometric challenge was sent."
