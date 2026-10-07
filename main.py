@@ -1,7 +1,9 @@
 import logging
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from secureauth.agents.verification_agent import verify_otp
@@ -12,6 +14,13 @@ from secureauth.schemas.models import LoginEvent, RiskAssessment
 logger = logging.getLogger("secureauth.api")
 
 app = FastAPI(title="SecureAuth AI Copilot")
+
+_PAGE = Path(__file__).resolve().parent / "static" / "index.html"
+
+
+@app.get("/")
+def home() -> FileResponse:
+    return FileResponse(_PAGE)
 
 _CHALLENGE_ACTIONS = {"challenge_otp", "challenge_biometric"}
 
@@ -41,7 +50,7 @@ def login_event(event: LoginEvent) -> LoginEventResponse:
         return _login_response(state.assessment)
     except Exception as exc:
         _record_failure("login-event", event.user_id, exc)
-        raise HTTPException(status_code=500, detail="Login assessment failed") from exc
+        raise HTTPException(status_code=500, detail=_public_error(exc, "Login assessment failed")) from exc
 
 
 @app.post("/verify-otp", response_model=VerifyOtpResponse)
@@ -71,6 +80,12 @@ def _login_response(assessment: RiskAssessment) -> LoginEventResponse:
         challenge_sent=challenge_sent,
         message=message,
     )
+
+
+def _public_error(exc: Exception, fallback: str) -> str:
+    if "SUPABASE_URL and SUPABASE_KEY must be set" in str(exc):
+        return "Add SUPABASE_URL and SUPABASE_KEY in a .env file, then restart the app."
+    return fallback
 
 
 def _record_failure(operation: str, user_id: str, exc: Exception) -> None:

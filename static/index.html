@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SecureAuth</title>
+  <style>
+    :root {
+      --ink: #1b2430;
+      --muted: #5d6b7a;
+      --line: #e4ddd2;
+      --paper: #f6f3ee;
+      --card: #fffcf8;
+      --accent: #0f6e6e;
+      --low: #1f7a4d;
+      --medium: #9a6700;
+      --high: #a33b32;
+      --danger-bg: #fdeceb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--paper);
+      font: 16px/1.5 "Segoe UI", system-ui, sans-serif;
+    }
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: -0.03em;
+    }
+    header p {
+      margin: 8px 0 0;
+      max-width: 62ch;
+      color: var(--muted);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+      margin-top: 28px;
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+    form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 14px;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    label.wide { grid-column: 1 / -1; }
+    input, select, button {
+      font: inherit;
+      color: var(--ink);
+    }
+    input, select {
+      width: 100%;
+      border: 1px solid #d5cec3;
+      background: #fff;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .actions { grid-column: 1 / -1; display: flex; }
+    .empty, .error, .result { margin: 0; }
+    .empty { color: var(--muted); }
+    .error {
+      background: var(--danger-bg);
+      color: var(--high);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .badge {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .low { background: #e5f6ee; color: var(--low); }
+    .medium { background: #fff4d6; color: var(--medium); }
+    .high { background: #fdeceb; color: var(--high); }
+    .score {
+      margin: 0;
+      font-size: 42px;
+      letter-spacing: -0.04em;
+    }
+    .continue {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: -0.03em;
+    }
+    .message { margin: 8px 0 0; }
+    ul { margin: 12px 0 0; padding-left: 18px; }
+    .otp {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      display: none;
+    }
+    .otp.show { display: block; }
+    .otp-row { display: flex; gap: 8px; }
+    .otp-row input { letter-spacing: 0.2em; }
+    .otp p { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+    @media (max-width: 800px) {
+      .layout, form { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SecureAuth</h1>
+      <p>Check a login against the user's usual device, place, and time. The score decides whether to allow it, ask for a code or fingerprint, or block it.</p>
+    </header>
+    <div class="layout">
+      <section>
+        <h2>Login attempt</h2>
+        <form id="login-form">
+          <label>User
+            <input name="user_id" value="user-1" required>
+          </label>
+          <label>When
+            <input name="timestamp" type="datetime-local" required>
+          </label>
+          <label>IP address
+            <input name="ip_address" value="203.0.113.10" required>
+          </label>
+          <label>Device id
+            <input name="device_id" value="phone-rahul" required>
+          </label>
+          <label>Device type
+            <select name="device_type">
+              <option>mobile</option>
+              <option>web</option>
+              <option>desktop</option>
+            </select>
+          </label>
+          <label>Login method
+            <select name="login_method">
+              <option>password</option>
+              <option>otp</option>
+              <option>biometric</option>
+            </select>
+          </label>
+          <label class="wide">Location
+            <input name="location" value="Mumbai">
+          </label>
+          <div class="actions">
+            <button type="submit" id="check-btn">Check login</button>
+          </div>
+        </form>
+      </section>
+      <section>
+        <h2>Decision</h2>
+        <div id="decision">
+          <p class="empty">Submit a login to see the risk score, the reason, and the next step.</p>
+        </div>
+        <div class="otp" id="otp-box">
+          <p>Enter the 6-digit code for this user. The screen never shows the code itself.</p>
+          <form id="otp-form" class="otp-row">
+            <input name="otp" inputmode="numeric" maxlength="6" placeholder="000000" required>
+            <button type="submit" id="otp-btn">Verify</button>
+          </form>
+          <p id="otp-result"></p>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const loginForm = document.querySelector("#login-form");
+    const decision = document.querySelector("#decision");
+    const otpBox = document.querySelector("#otp-box");
+    const otpResult = document.querySelector("#otp-result");
+    const stamp = loginForm.elements.timestamp;
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    stamp.value = now.toISOString().slice(0, 16);
+
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.querySelector("#check-btn");
+      button.disabled = true;
+      otpBox.classList.remove("show");
+      otpResult.textContent = "";
+      decision.innerHTML = "<p class='empty'>Checking this login…</p>";
+      const data = Object.fromEntries(new FormData(loginForm));
+      data.timestamp = new Date(data.timestamp).toISOString();
+      if (!data.location) delete data.location;
+      try {
+        const response = await fetch("/login-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || "Login assessment failed");
+        renderDecision(body);
+        if (body.recommended_action === "challenge_otp") otpBox.classList.add("show");
+      } catch (error) {
+        decision.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.querySelector("#otp-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.querySelector("#otp-btn");
+      button.disabled = true;
+      otpResult.textContent = "Checking the code…";
+      try {
+        const response = await fetch("/verify-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: loginForm.elements.user_id.value,
+            otp: new FormData(event.target).get("otp"),
+          }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || "OTP verification failed");
+        if (body.success) {
+          otpBox.classList.remove("show");
+          decision.innerHTML = `
+            <span class="badge low">allowed</span>
+            <p class="continue">Login can continue</p>
+            <p class="message">The code matched for ${escapeHtml(loginForm.elements.user_id.value)}.</p>
+          `;
+        } else {
+          otpResult.textContent = "Code did not match.";
+        }
+      } catch (error) {
+        otpResult.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    function renderDecision(body) {
+      const level = body.assessment.risk_level;
+      const reasons = body.assessment.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
+      decision.innerHTML = `
+        <span class="badge ${escapeHtml(level)}">${escapeHtml(level)} risk</span>
+        <p class="score">${Number(body.assessment.risk_score).toFixed(2)}</p>
+        <p class="message"><strong>${escapeHtml(body.recommended_action)}</strong> — ${escapeHtml(body.recommended_action === "allow" ? "Login can continue." : body.message)}</p>
+        <ul>${reasons}</ul>
+      `;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      })[char]);
+    }
+  </script>
+</body>
+</html>
